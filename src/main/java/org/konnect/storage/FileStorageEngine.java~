@@ -1,0 +1,111 @@
+package org.konnect.storage;
+
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class FileStorageEngine {
+    private final String basePath;
+    private final Map<String, TenantData> tenantDataMap; // Tenant-specific data
+
+    // Constructor
+    public FileStorageEngine(String basePath) {
+        this.basePath = basePath;
+        this.tenantDataMap = new ConcurrentHashMap<>();
+    }
+
+    // Write key-value pair for a tenant
+    public synchronized void write(String tenantId, String key, String value) throws IOException {
+        TenantData tenantData = getTenantData(tenantId);
+        long offset = tenantData.storageFile.length();
+        String entry = key + "=" + value + "\n";
+        tenantData.storageFile.seek(offset);
+        tenantData.storageFile.write(entry.getBytes());
+        tenantData.index.put(key, offset); // Update tenant-specific index
+    }
+
+    // Read the value for a key under a tenant
+    public synchronized String read(String tenantId, String key) throws IOException {
+        TenantData tenantData = getTenantData(tenantId);
+        Long offset = tenantData.index.get(key);
+        if (offset == null) {
+            return null; // Key not found
+        }
+        tenantData.storageFile.seek(offset);
+        String line = tenantData.storageFile.readLine();
+        if (line != null) {
+            String[] parts = line.split("=", 2);
+            if (parts[0].equals(key)) {
+                return parts[1];
+            }
+        }
+        return null;
+    }
+
+    // Compact the file for a specific tenant
+    public synchronized void compact(String tenantId) throws IOException {
+        TenantData tenantData = getTenantData(tenantId);
+        File tempFile = new File(tenantData.filePath + ".tmp");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile))) {
+            for (Map.Entry<String, Long> entry : tenantData.index.entrySet()) {
+                String key = entry.getKey();
+                String value = read(tenantId, key);
+                writer.write(key + "=" + value + "\n");
+            }
+        }
+        tenantData.storageFile.close();
+        File originalFile = new File(tenantData.filePath);
+        if (!originalFile.delete() || !tempFile.renameTo(originalFile)) {
+            throw new IOException("Failed to compact storage file for tenant: " + tenantId);
+        }
+        tenantData.storageFile = new RandomAccessFile(tenantData.filePath, "rw");
+        tenantData.index.clear();
+        tenantData.loadIndex(); // Rebuild the index after compaction
+    }
+
+    // Close the storage engine
+    public synchronized void close() throws IOException {
+        for (TenantData tenantData : tenantDataMap.values()) {
+            tenantData.storageFile.close();
+        }
+    }
+
+    // Get or initialize tenant-specific data
+    private TenantData getTenantData(String tenantId) throws IOException {
+        return tenantDataMap.computeIfAbsent(tenantId, id -> {
+            try {
+                return new TenantData(basePath + "/" + id + ".db");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    // Inner class for tenant-specific data
+    private static class TenantData {
+        private final String filePath;
+        private final Map<String, Long> index; // Key to file offset
+        private RandomAccessFile storageFile;
+
+        public TenantData(String filePath) throws IOException {
+            this.filePath = filePath;
+            this.index = new HashMap<>();
+            this.storageFile = new RandomAccessFile(filePath, "rw");
+            loadIndex();
+        }
+
+        // Load the index from the file on startup
+        private void loadIndex() throws IOException {
+            long offset = 0;
+            storageFile.seek(0);
+            String line;
+            while ((line = storageFile.readLine()) != null) {
+                String[] parts = line.split("=", 2);
+                if (parts.length == 2) {
+                    index.put(parts[0], offset);
+                }
+                offset = storageFile.getFilePointer();
+            }
+        }
+    }
+}

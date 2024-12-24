@@ -1,0 +1,28 @@
+package org.konnect.storage;
+
+
+import java.util.*;
+
+public class InMemoryStorageEngine implements StorageEngine {
+    private final TreeMap<String, String> store = new TreeMap<>();
+
+    @Override
+    public void write(String key, String value) {
+        store.put(key, value);
+    }
+
+    @Override
+    public String read(String key) {
+        return store.get(key);
+    }
+
+    @Override
+    public void delete(String key) {
+        store.remove(key);
+    }
+
+    @Override
+    public List<String> scan(String startKey, String endKey) {
+        return new ArrayList<>(store.subMap(startKey, true, endKey, true).values());
+    }
+}

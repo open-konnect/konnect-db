@@ -1,0 +1,4 @@
+package org.konnect.core;
+
+public class DefaultKeyValueStoreTest {
+}
