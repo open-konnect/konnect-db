@@ -1,42 +1,38 @@
 package org.konnect.app;
 
-import org.konnect.cluster.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
 import java.io.IOException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+
+import static org.konnect.cluster.ClusterConstants.*;
 
 @SpringBootApplication
 @ComponentScan("org.konnect.beans")
 public class KonnectDBApplication {
 
-    public static void main(String[] args) throws IOException {
-        startClusterNode(args);
+    private static Logger log = LoggerFactory.getLogger(KonnectDBApplication.class);
+
+    public static void main(String[] args) throws IOException, InterruptedException {
         SpringApplication.run(KonnectDBApplication.class, args);
+        //startClusterNode();
     }
 
-    private static Node getNode(String arg) {
-        String[] hostPort = arg.split(":");
-        Integer port = Integer.parseInt(hostPort[1]);
-        return new Node(hostPort[0], hostPort[0], port);
-    }
+    private static void startClusterNode() throws IOException, InterruptedException {
+        log.info("Node Id {} and Ip {} port {} and seed {} found", SELF_NODE_ID, SELF_NODE_IP, NODE_PORT, SEED_NODE);
+        // ClusterNode selfNode = new ClusterNode(nodeId, nodeIp, nodePort);
 
-    private static void startClusterNode(String[] args) throws IOException {
-
-        Node selfNode = getNode(args[0]);
-        String seedNode = args[1];
-
-        new NodeServer(selfNode).start();
+        //SelfNode.INSTANCE.bootstrap();
+        //new ClusterServer().start();
 
         // Join the cluster using a seed node
-        ClusterUtils.joinCluster(selfNode, seedNode);
+        // ClusterUtils.tryJoinCluster(selfNode, seedNode);
 
         // Start periodic peer sync
-        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-        executor.scheduleAtFixedRate(new PeerSyncTask(selfNode), 5, 5, TimeUnit.SECONDS);
+        //ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        //executor.scheduleAtFixedRate(new PeerSyncTask(), 20, 20, TimeUnit.SECONDS);
     }
 }

@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: konnect-db
+spec:
+  selector:
+    app: konnect-db
+  ports:
+    - protocol: TCP
+      name: konnect-db
+      port: 80
+      targetPort: 8080
+    - protocol: TCP
+      name: konnect-db-cluster
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP
+---
+# Stateful deployment of this service
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: konnect-db
+spec:
+  serviceName: konnect-db
+  replicas: 2
+  #podManagementPolicy: OrderedReady # Deploy pods sequentially
+  selector:
+    matchLabels:
+      app: konnect-db
+  template:
+    metadata:
+      labels:
+        app: konnect-db
+    spec:
+      containers:
+        - name: konnect-db
+          image: konnect-db:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          volumeMounts:
+            - mountPath: /data
+              name: konnect-db-storage
+          readinessProbe:
+            httpGet:
+              path: /cluster/ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /cluster/health
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          env:
+            # Pod's unique name as NODE_ID
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Pod's IP address
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MAX_REPLICA
+              value: "3"
+            - name: NODE_PORT
+              value: "9090"
+            - name: SEED_NODE
+              value: "konnect-db-"
+            - name: JAVA_OPTS
+              value: "-Xms100m -Xmx100m"
+      volumes:
+        - name: konnect-db-storage
+          persistentVolumeClaim:
+            claimName: konnect-db-pvc
+
+---
+# Ingress for konnect-db
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: konnect-db
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  rules:
+    - host: konnect-db.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: konnect-db
+                port:
+                  number: 80
+
+---
+# Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: konnect-db-pv
+spec:
+  capacity:
+    storage: 10Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data/konnect-db
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konnect-db-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi

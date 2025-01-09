@@ -1,29 +1,40 @@
 package org.konnect.cluster;
 
+import lombok.Getter;
+import org.konnect.utils.NodeIdUtils;
+import org.konnect.utils.StringUtils;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ClusterNode {
 
-    private final String nodeId;
-    private final String host;
-    private final int port;
-    private final List<String> clusterNodes; // List of active nodes
-    private final ConsistentHashing hashRing;
+    @Getter private final String nodeId;
+    @Getter private final int nodeIdx;
+    @Getter private final String host;
+    @Getter private final int port;
+    @Getter private final List<String> peerNodes; // List of active nodes
+    private final ConsistentHashingOld hashRing;
 
     public ClusterNode(String nodeId, String host, int port) {
         this.nodeId = nodeId;
+        this.nodeIdx = NodeIdUtils.getNodeIndex(nodeId);
         this.host = host;
         this.port = port;
-        this.clusterNodes = new CopyOnWriteArrayList<>();
-        this.hashRing = new ConsistentHashing(3); // 3 virtual nodes per node
+        this.peerNodes = new CopyOnWriteArrayList<>();
+        this.hashRing = new ConsistentHashingOld(3); // 3 virtual nodes per node
         addNodeToRing(nodeId); // Add self to hash ring
     }
 
     // Add a new node to the cluster
     public synchronized void addNode(String node) {
-        if (!clusterNodes.contains(node)) {
-            clusterNodes.add(node);
+        if (StringUtils.isBlank(node)) {
+            return;
+        }
+        node = node.trim();
+        if (!nodeId.equals(node) && !peerNodes.contains(node)) {
+            peerNodes.add(node);
             hashRing.addNode(node);
             broadcastClusterUpdate();
         }
@@ -31,11 +42,22 @@ public class ClusterNode {
 
     // Remove a node from the cluster
     public synchronized void removeNode(String node) {
-        if (clusterNodes.contains(node)) {
-            clusterNodes.remove(node);
+        if (StringUtils.isBlank(node)) {
+            return;
+        }
+        node = node.trim();
+        if (peerNodes.contains(node)) {
+            peerNodes.remove(node);
             hashRing.removeNode(node);
             broadcastClusterUpdate();
         }
+    }
+
+    public List<String> getAllNodes() {
+        List<String> allNodes = new ArrayList<>();
+        allNodes.add(nodeId);
+        allNodes.addAll(peerNodes);
+        return allNodes;
     }
 
     // Recalculate the hash ring when the cluster changes
@@ -45,7 +67,7 @@ public class ClusterNode {
 
     // Broadcast cluster updates to other nodes
     private void broadcastClusterUpdate() {
-        for (String node : clusterNodes) {
+        for (String node : peerNodes) {
             if (!node.equals(nodeId)) {
                 // Call an API on the node to sync cluster topology
                 // Example: httpClient.post(node + "/update-cluster", clusterNodes);
@@ -57,11 +79,4 @@ public class ClusterNode {
     public String getNodeForKey(String namespace, String key) {
         return hashRing.getNode(namespace, key);
     }
-
-    // Get the list of active nodes
-    public List<String> getClusterNodes() {
-        return clusterNodes;
-    }
-
-
 }

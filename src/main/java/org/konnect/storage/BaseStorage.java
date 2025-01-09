@@ -4,13 +4,13 @@ import java.util.List;
 
 public interface BaseStorage {
 
-    String read(String key);
+    String read(String namespace, String key);
 
-    void write(String key, String value);
+    void write(String namespace, String key, String value);
 
-    void delete(String key);
+    void delete(String namespace, String key);
 
-    List<String> scan(String startKey, String endKey);
+    List<String> scan(String namespace, String startKey, String endKey);
 
     void compaction();
 

@@ -9,7 +9,7 @@ public class InMemoryKeyValueStoreTest {
 
     @BeforeEach
     public void setUp() {
-        keyValueStore = new InMemoryKeyValueStore();
+        keyValueStore = new InMemoryKeyValueStore(null);
     }
 
     @Test

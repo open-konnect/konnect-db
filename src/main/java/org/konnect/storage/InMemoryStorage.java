@@ -14,22 +14,22 @@ public class InMemoryStorage implements BaseStorage {
     }
 
     @Override
-    public String read(String key) {
+    public String read(String namespace, String key) {
         return localMap.get(key);
     }
 
     @Override
-    public void write(String key, String value) {
+    public void write(String namespace, String key, String value) {
         localMap.put(key, value);
     }
 
     @Override
-    public void delete(String key) {
+    public void delete(String namespace, String key) {
         localMap.remove(key);
     }
 
     @Override
-    public List<String> scan(String startKey, String endKey) {
+    public List<String> scan(String namespace, String startKey, String endKey) {
         return new ArrayList<>(localMap.subMap(startKey, true, endKey, true).keySet());
     }
 

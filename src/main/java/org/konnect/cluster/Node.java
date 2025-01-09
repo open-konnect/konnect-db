@@ -1,45 +1,31 @@
 package org.konnect.cluster;
 
-import java.util.HashSet;
-import java.util.Set;
+import lombok.Getter;
+import org.konnect.utils.NodeIdUtils;
 
+@Getter
 public class Node {
-    private final String id; // Unique identifier for the node
-    private final String host;
-    private final int port;
-    private final Set<String> knownPeers; // List of known peer nodes
+    private final int index;
+    private final String name;
+    private final String clusterEndpoint;
+    private final String apiEndpoint;
 
-    public Node(String id, String host, int port) {
-        this.id = id;
-        this.host = host;
-        this.port = port;
-        this.knownPeers = new HashSet<>();
+    public Node(int idx) {
+        this.index = idx;
+        this.name = NodeIdUtils.nodeNameFromIndex(idx);
+        this.clusterEndpoint = NodeIdUtils.nodeEndpointFromIndex(idx, ClusterConstants.NODE_PORT);
+        this.apiEndpoint = NodeIdUtils.nodeEndpointFromIndex(idx, ClusterConstants.API_PORT);
     }
 
-    // Getters
-    public String getId() {
-        return id;
+    public Node(String name) {
+        this(NodeIdUtils.getNodeIndex(name));
     }
 
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public Set<String> getKnownPeers() {
-        return knownPeers;
-    }
-
-    // Add a new peer
-    public void addPeer(String peer) {
-        knownPeers.add(peer);
-    }
-
-    // Remove a peer
-    public void removePeer(String peer) {
-        knownPeers.remove(peer);
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof Node) {
+            return ((Node) other).index == this.index;
+        }
+        return false;
     }
 }

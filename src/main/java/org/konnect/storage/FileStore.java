@@ -24,7 +24,7 @@ public class FileStore implements BaseStorage {
     }
 
     @Override
-    public void write(String key, String value) {
+    public void write(String namespace, String key, String value) {
         long offset = 0;
         try {
             offset = storageFile.length();
@@ -38,7 +38,7 @@ public class FileStore implements BaseStorage {
     }
 
     @Override
-    public String read(String key) {
+    public String read(String namespace, String key) {
         Long offset = index.get(key);
         if (offset == null) {
             return null; // Key not found
@@ -61,12 +61,12 @@ public class FileStore implements BaseStorage {
     }
 
     @Override
-    public void delete(String key) {
+    public void delete(String namespace, String key) {
         index.remove(key);
     }
 
     @Override
-    public List<String> scan(String startKey, String endKey) {
+    public List<String> scan(String namespace, String startKey, String endKey) {
         return new ArrayList<>(index.subMap(startKey, true, endKey, true).keySet());
     }
 
@@ -77,7 +77,8 @@ public class FileStore implements BaseStorage {
             // Read latest values from index
             for (Map.Entry<String, Long> entry : index.entrySet()) {
                 String key = entry.getKey();
-                String value = read(key);
+                // Currently namespace is not saved in the file since each namespace has its own file
+                String value = read(null, key);
                 writer.write(key + "=" + value + "\n");
             }
         } catch (IOException e) {
